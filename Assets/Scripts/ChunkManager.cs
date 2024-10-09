@@ -3,142 +3,98 @@ using UnityEngine;
 
 public class ChunkManager : MonoBehaviour
 {
-  [SerializeField]
-  private static NoiseGenerator noiseGenerator;
-
-  private const int _WorldSize = 20;
+  private const int _RenderDistance = 10;
   private const int _LOD = 4;
-  private Dictionary<Vector3Int, GameObject> chunks = new Dictionary<Vector3Int, GameObject>();
+  private static Dictionary<Vector3Int, GameObject> chunks = new Dictionary<Vector3Int, GameObject>();
 
-  private int count;
-  private Color[] colors = { Color.white, Color.black, Color.cyan, Color.blue, Color.magenta, Color.red, Color.yellow, Color.green };
-  private GameObject[] visuals = new GameObject[_WorldSize * _WorldSize];
+  private static Vector3Int _playerChunkPos = new Vector3Int(0, 0, 0);
 
-  public void Remake()
+  public static void UpdatePlayerPosition(Vector3 playerPos)
   {
-    DestroyAllChunks();
-    CreateTerrain(_WorldSize);
-  }
 
-  void Start()
-  {
-    count = 0;
-    GameObject noiseObj = new GameObject("NoiseGenerator");
-    noiseGenerator = noiseObj.AddComponent<NoiseGenerator>();
-    noiseGenerator.NoiseShader = Resources.Load<ComputeShader>("Compute/NoiseCompute");
-
-    CreateTerrain(_WorldSize);
-  }
-
-  /// <summary>
-  ///
-  /// </summary>
-  /// <param name="worldSize">The length * width of the world in chunk coords.</param>
-  void CreateTerrain(int worldSize)
-  {
-    Debug.Log("VALIDATE");
-    // float offset = (float)GridMetrics.Scale / (GridMetrics.PointsPerChunk(_LOD) + 1);
-    for (int x = 0; x < worldSize; x++)
+    if (GetChunkCoordFromWorldCoord(playerPos) != _playerChunkPos)
     {
-      for (int z = 0; z < worldSize; z++)
+      _playerChunkPos = GetChunkCoordFromWorldCoord(playerPos);
+      GenerateChunksAroundPlayer();
+      RemoveFarChunks();
+    }
+  }
+
+  // TODO load player made chunks
+  static void GenerateChunksAroundPlayer()
+  {
+    for (int chunkX = _playerChunkPos.x - _RenderDistance; chunkX < _playerChunkPos.x + _RenderDistance; chunkX++)
+    {
+      for (int chunkZ = _playerChunkPos.z - _RenderDistance; chunkZ < _playerChunkPos.z + _RenderDistance; chunkZ++)
       {
-        int[] verticalChunks = FindVerticalChunks(x, z);
+        int[] verticalChunks = FindVerticalChunks(chunkX, chunkZ);
 
-        foreach (int y in verticalChunks)
+        foreach (int chunkY in verticalChunks)
         {
-          chunks.Add(
-            new Vector3Int(x, y, z),
-            CreateChunkFromNoise(
-              new Vector3(
-                x * GridMetrics.ChunkScale,
-                y * GridMetrics.ChunkScale,
-                z * GridMetrics.ChunkScale),
-              new Vector3(
-                x * GridMetrics.NoiseScale,
-                y * GridMetrics.NoiseScale,
-                z * GridMetrics.NoiseScale)));
-            // Can slightly fix chunk borders at lower LOD. I assume noise is fine, main issue has to be from marching algorithm
-            // new Vector3(x * offset, 0, z * offset));
-
-          // visuals[x + z] = createVisual(new Vector3(x * GridMetrics.Scale, 0, z * GridMetrics.Scale));
+          Vector3Int chunkPos = new Vector3Int(chunkX, chunkY, chunkZ);
+          if (!chunks.ContainsKey(chunkPos))
+          {
+            chunks.Add(
+              chunkPos,
+              TerrainGenerator.CreateChunkFromNoise(
+                new Vector3(
+                  chunkX * GridMetrics.ChunkScale,
+                  chunkY * GridMetrics.ChunkScale,
+                  chunkZ * GridMetrics.ChunkScale),
+                new Vector3(
+                  chunkX * GridMetrics.NoiseScale,
+                  chunkY * GridMetrics.NoiseScale,
+                  chunkZ * GridMetrics.NoiseScale),
+                _LOD));
+          }
         }
-
       }
     }
   }
 
-  /// <summary>
-  ///
-  /// </summary>
-  /// <param name="chunkPos">The chunk coord to generate at using noise generator.</param>
-  /// <returns></returns>
-  public static GameObject CreateChunkFromNoise(Vector3 chunkPos, Vector3 noisePos)
-  {
-    int chunkX = Mathf.FloorToInt(chunkPos.x / GridMetrics.ChunkScale);
-    int chunkY = Mathf.FloorToInt(chunkPos.y / GridMetrics.ChunkScale);
-    int chunkZ = Mathf.FloorToInt(chunkPos.z / GridMetrics.ChunkScale);
-
-    GameObject newChunk = new GameObject($"Chunk-{chunkX}.{chunkY}.{chunkZ}");
-    newChunk.transform.position = chunkPos;
-
-    MeshFilter meshFilter = newChunk.AddComponent<MeshFilter>();
-    MeshCollider meshCollider = newChunk.AddComponent<MeshCollider>();
-    MeshRenderer meshRenderer = newChunk.AddComponent<MeshRenderer>();
-    Chunk chunk = newChunk.AddComponent<Chunk>();
-
-    meshRenderer.material = Resources.Load<Material>("Materials/Ground");
-    // meshRenderer.material = Resources.Load<Material>("Materials/Wireframe");
-
-    chunk.MeshFilter = meshFilter;
-    chunk.MeshCollider = meshCollider;
-    chunk.NoiseGenerator = noiseGenerator;
-    chunk.MarchingShader = Resources.Load<ComputeShader>("Compute/MarchingCubesCompute");
-    chunk.LOD = _LOD;
-    chunk._noisePos = noisePos;
-    // chunk._ChunkWorldPos = chunkPos - offset;  // For "fixing" lower LOD borders.
-    chunk.CreateFromNoise();
-
-    return newChunk;
-  }
-
-  /// <summary>
-  ///
-  /// </summary>
-  /// <param name="chunkPos">The chunk coord to generate at using just the edit weights.</param>
-  /// <returns></returns>
-  public static GameObject CreateChunkFromPlayer(
-    Vector3 chunkPos,
+  public static void CreateChunkFromPlayer(
+    Vector3Int chunkPos,
     Vector3 noisePos,
     Vector3 worldHitPosition,
     float brushSize,
     bool add)
   {
-    int chunkX = Mathf.FloorToInt(chunkPos.x / GridMetrics.ChunkScale);
-    int chunkY = Mathf.FloorToInt(chunkPos.y / GridMetrics.ChunkScale);
-    int chunkZ = Mathf.FloorToInt(chunkPos.z / GridMetrics.ChunkScale);
-
-    GameObject newChunk = new GameObject($"Chunk-{chunkX}.{chunkY}.{chunkZ}");
-    newChunk.transform.position = chunkPos;
-
-    MeshFilter meshFilter = newChunk.AddComponent<MeshFilter>();
-    MeshCollider meshCollider = newChunk.AddComponent<MeshCollider>();
-    MeshRenderer meshRenderer = newChunk.AddComponent<MeshRenderer>();
-    Chunk chunk = newChunk.AddComponent<Chunk>();
-
-    meshRenderer.material = Resources.Load<Material>("Materials/Ground");
-    // meshRenderer.material = Resources.Load<Material>("Materials/Wireframe");
-
-    chunk.MeshFilter = meshFilter;
-    chunk.MeshCollider = meshCollider;
-    chunk.NoiseGenerator = noiseGenerator;
-    chunk.MarchingShader = Resources.Load<ComputeShader>("Compute/MarchingCubesCompute");
-    chunk.LOD = _LOD;
-    chunk._noisePos = noisePos;
-    // chunk._ChunkWorldPos = chunkPos - offset;  // For "fixing" lower LOD borders.
-    chunk.CreateFromPlayer(worldHitPosition, brushSize, add);
-
-    return newChunk;
+    chunks.Add(
+      chunkPos,
+      TerrainGenerator.CreateChunkFromPlayer(chunkPos, noisePos, worldHitPosition, brushSize, add, _LOD));
   }
+
+  static void RemoveFarChunks()
+  {
+    List<Vector3Int> chunksToRemove = new List<Vector3Int>();
+
+    foreach (Vector3Int chunkPos in chunks.Keys)
+    {
+      if (!IsChunkInRenderDistance(chunkPos))
+      {
+        chunksToRemove.Add(chunkPos);
+      }
+    }
+
+    foreach (Vector3Int chunkPos in chunksToRemove)
+    {
+      if (!IsChunkInRenderDistance(chunkPos))
+      {
+        Destroy(chunks[chunkPos]);
+        chunks.Remove(chunkPos);
+      }
+    }
+  }
+
+  static bool IsChunkInRenderDistance(Vector3Int chunkPos)
+  {
+    Vector3 distance = chunkPos - _playerChunkPos;
+
+    return Mathf.Abs(distance.x) <= _RenderDistance &&
+      Mathf.Abs(distance.y) <= _RenderDistance &&
+      Mathf.Abs(distance.z) <= _RenderDistance;
+  }
+
 
   /// <summary>
   /// Finds if the noise for a chunk has below and above ground values, meaning
@@ -147,20 +103,22 @@ public class ChunkManager : MonoBehaviour
   /// <param name="x">Chunk coord x.</param>
   /// <param name="z">Chunk coord z.</param>
   /// <returns>List of vertical chunks at the given x, z chunk coord.</returns>
-  int[] FindVerticalChunks(int x, int z)
+  static int[] FindVerticalChunks(int x, int z)
   {
     List<int> verticalChunks = new List<int>();
     for (int y = 0; y < GridMetrics.VerticalChunks; y++)
     {
       bool negativeNoise = false;
       bool positiveNoise = false;
-      float[] noise = noiseGenerator.GetNoise(_LOD, new Vector3(x * GridMetrics.NoiseScale, y * GridMetrics.NoiseScale, z * GridMetrics.NoiseScale));
+      float[] noise = NoiseGenerator.Instance.GetNoise(
+        _LOD,
+        new Vector3(
+          x * GridMetrics.NoiseScale,
+          y * GridMetrics.NoiseScale,
+          z * GridMetrics.NoiseScale));
+
       for (int i = 0; i < noise.Length; i++)
       {
-        // if (x == 8 && z == 4 && y == 1 && i > noise.Length - GridMetrics.PointsPerChunk(_LOD) * GridMetrics.PointsPerChunk(_LOD))
-        // {
-        //   Debug.Log(noise[i]);
-        // }
         if (noise[i] < 0.5)
         {
           negativeNoise = true;
@@ -182,21 +140,9 @@ public class ChunkManager : MonoBehaviour
     return verticalChunks.ToArray();
   }
 
-  GameObject createVisual(Vector3 chunkPos)
-  {
-    GameObject newVisual = new GameObject("Visual");
-    newVisual.transform.position = chunkPos;
-    NoiseVisual visual = newVisual.AddComponent<NoiseVisual>();
-
-    visual.NoiseGenerator = noiseGenerator;
-    visual.LOD = _LOD;
-    visual._ChunkWorldPos = chunkPos;
-    visual.color1 = colors[count];
-    visual.color2 = colors[count + 1];
-
-    count += 2;
-    return newVisual;
-  }
+  //////////////////////////////////////////////////////////////////////////////
+  /// Util
+  //////////////////////////////////////////////////////////////////////////////
 
   /// <summary>
   /// Translates world position to Chunk object.
@@ -215,9 +161,9 @@ public class ChunkManager : MonoBehaviour
   /// </summary>
   /// <param name="worldPos">The world position to translate.</param>
   /// <returns></returns>
-  public static Vector3 GetChunkCoordFromWorldCoord(Vector3 worldPos)
+  public static Vector3Int GetChunkCoordFromWorldCoord(Vector3 worldPos)
   {
-    return new Vector3(
+    return new Vector3Int(
       Mathf.FloorToInt(worldPos.x / GridMetrics.ChunkScale),
       Mathf.FloorToInt(worldPos.y / GridMetrics.ChunkScale),
       Mathf.FloorToInt(worldPos.z / GridMetrics.ChunkScale));
@@ -230,21 +176,6 @@ public class ChunkManager : MonoBehaviour
   /// <returns></returns>
   public static Vector3 GetNoiseCoordFromWorldCoord(Vector3 worldPos)
   {
-    Debug.Log($"World: {worldPos} - Chunk: {GetChunkCoordFromWorldCoord(worldPos)} - Noise? {GetChunkCoordFromWorldCoord(worldPos) * GridMetrics.ChunkScale / GridMetrics.NoiseScale}");
     return GetChunkCoordFromWorldCoord(worldPos) * GridMetrics.ChunkScale / GridMetrics.NoiseScale;
-  }
-
-  private void DestroyAllChunks()
-  {
-    foreach (var chunkPair in chunks)
-    {
-      Chunk chunk = chunkPair.Value.GetComponent<Chunk>();
-
-      // Destroy the chunk GameObject
-      Destroy(chunkPair.Value);
-    }
-
-    // Clear the dictionary
-    chunks.Clear();
   }
 }

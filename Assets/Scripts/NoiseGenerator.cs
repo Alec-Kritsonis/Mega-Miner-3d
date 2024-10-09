@@ -1,9 +1,11 @@
 using UnityEngine;
 
-public class NoiseGenerator : MonoBehaviour
+public class NoiseGenerator
 {
+  private static NoiseGenerator _instance;
+
   ComputeBuffer _weightsBuffer;
-  public ComputeShader NoiseShader;
+  public ComputeShader _noiseShader;
 
   [SerializeField] float noiseScale = 1f;
   [SerializeField] float amplitude = 60f;
@@ -11,11 +13,21 @@ public class NoiseGenerator : MonoBehaviour
   [SerializeField] int octaves = 12;
   [SerializeField, Range(0f, 1f)] float groundPercent = 1f;
 
-  void OnValidate()
+  public static NoiseGenerator Instance
   {
-    ChunkManager c = GameObject.Find("ChunkManager")?.GetComponent<ChunkManager>();
-    c.Remake();
+    get
+    {
+      if (_instance == null)
+      {
+        _instance = new NoiseGenerator();
+        _instance._noiseShader = Resources.Load<ComputeShader>("Compute/NoiseCompute");
+      }
+
+      return _instance;
+    }
   }
+
+  private NoiseGenerator() {}
 
   public float[] GetNoise(int lod, Vector3 worldPos)
   {
@@ -23,19 +35,19 @@ public class NoiseGenerator : MonoBehaviour
     float[] noiseValues =
       new float[GridMetrics.PointsPerChunk(lod) * GridMetrics.PointsPerChunk(lod) * GridMetrics.PointsPerChunk(lod)];
 
-    NoiseShader.SetBuffer(0, "_Weights", _weightsBuffer);
+    _noiseShader.SetBuffer(0, "_Weights", _weightsBuffer);
 
-    NoiseShader.SetInt("_ChunkSize", GridMetrics.PointsPerChunk(lod));
-    NoiseShader.SetFloat("_NoiseScale", noiseScale);
-    NoiseShader.SetFloat("_Amplitude", amplitude);
-    NoiseShader.SetFloat("_Frequency", frequency);
-    NoiseShader.SetInt("_Octaves", octaves);
-    NoiseShader.SetFloat("_GroundPercent", groundPercent);
-    NoiseShader.SetInt("_Scale", GridMetrics.NoiseScale);
-    NoiseShader.SetInt("_GroundLevel", GridMetrics.GroundLevel);
-    NoiseShader.SetVector("_ChunkWorldPos", worldPos);
+    _noiseShader.SetInt("_ChunkSize", GridMetrics.PointsPerChunk(lod));
+    _noiseShader.SetFloat("_NoiseScale", noiseScale);
+    _noiseShader.SetFloat("_Amplitude", amplitude);
+    _noiseShader.SetFloat("_Frequency", frequency);
+    _noiseShader.SetInt("_Octaves", octaves);
+    _noiseShader.SetFloat("_GroundPercent", groundPercent);
+    _noiseShader.SetInt("_Scale", GridMetrics.NoiseScale);
+    _noiseShader.SetInt("_GroundLevel", GridMetrics.GroundLevel);
+    _noiseShader.SetVector("_ChunkWorldPos", worldPos);
 
-    NoiseShader.Dispatch(
+    _noiseShader.Dispatch(
       0,
       GridMetrics.ThreadGroups(lod),
       GridMetrics.ThreadGroups(lod),

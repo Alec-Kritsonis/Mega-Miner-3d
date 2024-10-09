@@ -74,21 +74,22 @@ public class TerraformingCamera : MonoBehaviour
         {
           // Calculate the position of the neighboring chunk
 
-          Vector3 neighborChunkPosition = new Vector3(
-            hitChunkPosition.x + xOffset * chunkSize,
-            hitChunkPosition.y + yOffset * chunkSize,
-            hitChunkPosition.z + zOffset * chunkSize);
+          Vector3Int neighborChunkPos = ChunkManager.GetChunkCoordFromWorldCoord(
+            new Vector3(
+              hitChunkPosition.x + xOffset * chunkSize,
+              hitChunkPosition.y + yOffset * chunkSize,
+              hitChunkPosition.z + zOffset * chunkSize));
 
           // Check if the brush affects this neighboring chunk
-          if (IsBrushAffectingChunk(neighborChunkPosition, chunkSize, brushMin, brushMax))
+          if (IsBrushAffectingChunk(neighborChunkPos, chunkSize, brushMin, brushMax))
           {
             // Get the neighboring chunk (assume you have a ChunkManager or similar system)
-            Chunk neighborChunk = ChunkManager.GetChunkAtPosition(neighborChunkPosition);
+            Chunk neighborChunk = ChunkManager.GetChunkAtPosition(neighborChunkPos);
             if (neighborChunk == null)
             {
               ChunkManager.CreateChunkFromPlayer(
-                neighborChunkPosition,
-                ChunkManager.GetNoiseCoordFromWorldCoord(neighborChunkPosition),
+                neighborChunkPos,
+                ChunkManager.GetNoiseCoordFromWorldCoord(neighborChunkPos),
                 hitPoint,
                 brushSize,
                 add);
@@ -104,11 +105,11 @@ public class TerraformingCamera : MonoBehaviour
     }
   }
 
-  private bool IsBrushAffectingChunk(Vector3 chunkPosition, float chunkSize, Vector3 brushMin, Vector3 brushMax)
+  private bool IsBrushAffectingChunk(Vector3 chunkPos, float chunkSize, Vector3 brushMin, Vector3 brushMax)
   {
     // Calculate the bounding box of the chunk
-    Vector3 chunkMin = chunkPosition;
-    Vector3 chunkMax = chunkPosition + new Vector3(chunkSize, chunkSize, chunkSize);
+    Vector3 chunkMin = chunkPos;
+    Vector3 chunkMax = chunkPos + new Vector3(chunkSize, chunkSize, chunkSize);
 
     // Check if the brush overlaps with the chunk
     return !(brushMin.x > chunkMax.x || brushMax.x < chunkMin.x ||

@@ -12,7 +12,6 @@ public class Chunk : MonoBehaviour
   ComputeBuffer _trianglesCountBuffer;
   ComputeBuffer _weightsBuffer;
 
-  public NoiseGenerator NoiseGenerator;
   public Vector3 _noisePos;
 
   [Range(0, 4)]
@@ -34,13 +33,12 @@ public class Chunk : MonoBehaviour
     Assert.IsNotNull(MarchingShader);
     Assert.IsNotNull(MeshFilter);
     Assert.IsNotNull(MeshCollider);
-    Assert.IsNotNull(NoiseGenerator);
 
     CreateBuffers();
     if (_weights == null)
     {
-      _weights = NoiseGenerator.GetNoise(GridMetrics.LastLod, _noisePos);
-      NoiseGenerator.CleanNoise(ref _weights);
+      _weights = NoiseGenerator.Instance.GetNoise(GridMetrics.LastLod, _noisePos);
+      NoiseGenerator.Instance.CleanNoise(ref _weights);
     }
 
     UpdateMesh();
