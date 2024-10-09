@@ -30,7 +30,6 @@ float3 interp(float3 edgeVertex1, float valueAtVertex1, float3 edgeVertex2, floa
   return (edgeVertex1 + (_IsoLevel - valueAtVertex1) * (edgeVertex2 - edgeVertex1) / (valueAtVertex2 - valueAtVertex1));
 }
 
-
 [numthreads(numThreads, numThreads, numThreads)]
 void March(uint3 id : SV_DispatchThreadID)
 {
@@ -86,7 +85,6 @@ void March(uint3 id : SV_DispatchThreadID)
     _Triangles.Append(tri);
   }
 }
-
 
 [numthreads(numThreads, numThreads, numThreads)]
 void UpdateWeights(uint3 id : SV_DispatchThreadID)

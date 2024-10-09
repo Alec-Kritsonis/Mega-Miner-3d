@@ -48,13 +48,21 @@ public class NoiseGenerator : MonoBehaviour
     return noiseValues;
   }
 
+  /// <summary>
+  /// Truncates any noise not involved in terrain generation.
+  /// </summary>
+  /// <param name="weights">Piecewised weights.</param>
   public void CleanNoise(ref float[] weights)
   {
     for (int i = 0; i < weights.Length; i++)
     {
-      if (weights[i] > GridMetrics.IsoLevel)
+      if (weights[i] < 0.0f)
       {
         weights[i] = 0.0f;
+      }
+      if (weights[i] > 1.0f)
+      {
+        weights[i] = 1.0f;
       }
     }
   }

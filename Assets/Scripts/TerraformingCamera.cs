@@ -14,14 +14,28 @@ public class TerraformingCamera : MonoBehaviour
 
 	private void LateUpdate()
   {
-		if (Input.GetMouseButton(0))
+    if (Input.GetKey(KeyCode.LeftShift) == true)
     {
-			Terraform(true);
-		}
-		else if (Input.GetMouseButton(1))
+      if (Input.GetMouseButtonDown(0))
+      {
+        Terraform(true);
+      }
+      else if (Input.GetMouseButtonDown(1))
+      {
+        Terraform(false);
+      }
+    }
+    else if (Input.GetKey(KeyCode.LeftShift) == false)
     {
-			Terraform(false);
-		}
+      if (Input.GetMouseButton(0))
+      {
+        Terraform(true);
+      }
+      else if (Input.GetMouseButton(1))
+      {
+        Terraform(false);
+      }
+    }
 	}
 
 	private void Terraform(bool add)

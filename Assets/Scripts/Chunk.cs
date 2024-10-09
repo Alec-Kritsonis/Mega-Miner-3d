@@ -40,7 +40,7 @@ public class Chunk : MonoBehaviour
     if (_weights == null)
     {
       _weights = NoiseGenerator.GetNoise(GridMetrics.LastLod, _noisePos);
-      // NoiseGenerator.CleanNoise(ref _weights);
+      NoiseGenerator.CleanNoise(ref _weights);
     }
 
     UpdateMesh();
@@ -130,15 +130,7 @@ public class Chunk : MonoBehaviour
     _weightsBuffer.SetData(_weights);
     _trianglesBuffer.SetCounterValue(0);
 
-
-    float startTime = Time.realtimeSinceStartup;  // Store start time
-
-    // Dispatch the compute shader
     MarchingShader.Dispatch(kernel, GridMetrics.ThreadGroups(LOD), GridMetrics.ThreadGroups(LOD), GridMetrics.ThreadGroups(LOD));
-
-    float endTime = Time.realtimeSinceStartup;  // Store end time
-    float elapsedTime = endTime - startTime;    // Calculate elapsed time in seconds
-    Debug.Log($"Marching Cubes Compute Shader took {elapsedTime} seconds");
 
     Triangle[] triangles = new Triangle[ReadTriangleCount()];
     _trianglesBuffer.GetData(triangles);
