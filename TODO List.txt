@@ -1,0 +1,56 @@
+
+################################################################
+## Terrain
+################################################################
+
+TODO: 
+	- Better generation
+		- biomes
+		- overhangs/cliffs
+		- plateus
+		- plains
+		- rivers
+	- Major overhaul noise generator to be better
+		- https://www.youtube.com/watch?v=YyVAaJqYAfE&ab_channel=AlanZucconi
+		
+	- 3d Noise for resources
+	- Terrain attributes
+		- hardness level (directly linked to what their weight should be)
+			- SMART IDEA: a tool needs to have a higher toughness than the hardness for it to be mineable
+		- drops
+	- Details
+		- rocks
+		- trees
+		- grass
+		- bushes
+	- Add render distance
+		- LOD for further chunks
+	
+		
+DONE:
+	- Marching cubes
+	- Cubic chunks
+	
+################################################################
+## Player
+################################################################
+
+
+################################################################
+## Multiplayer
+################################################################
+
+	- Tie terrain to a seed so we only have to send player changed terrain across rather than EVERYTHING
+		- Let every client render their own world
+		- seed is just an offset for how to move the noise generator to a different location
+
+################################################################
+## UI/HUD
+################################################################
+
+
+################################################################
+## Textures
+################################################################
+
+	- everything...
