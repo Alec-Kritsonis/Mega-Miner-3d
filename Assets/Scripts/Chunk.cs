@@ -55,18 +55,10 @@ public class Chunk : MonoBehaviour
 
     for (int i = 0; i < _weights.Length; i++)
     {
-      _weights[i] = 1.0f;  // Set each element to 1
+      _weights[i] = 1.0f;
     }
 
     EditWeights(worldHitPosition, brushSize, add);
-  }
-
-  private void OnValidate()
-  {
-    if (Application.isPlaying)
-    {
-      CreateFromNoise();
-    }
   }
 
   public void UpdateMesh()

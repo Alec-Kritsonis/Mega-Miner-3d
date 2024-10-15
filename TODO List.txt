@@ -3,7 +3,11 @@
 ## Terrain
 ################################################################
 
-TODO: 
+TODO:
+  - Save what cubic chunk coords have surface, then let each player generate that on their own.
+    - Finding what cubic chunks to generate is expensive and should only be done once.
+    -  So exploring might be slightly pricy but revisiting is instant
+
 	- Better generation
 		- biomes
 		- overhangs/cliffs
@@ -12,7 +16,7 @@ TODO:
 		- rivers
 	- Major overhaul noise generator to be better
 		- https://www.youtube.com/watch?v=YyVAaJqYAfE&ab_channel=AlanZucconi
-		
+
 	- 3d Noise for resources
 	- Terrain attributes
 		- hardness level (directly linked to what their weight should be)
@@ -25,12 +29,12 @@ TODO:
 		- bushes
 	- Add render distance
 		- LOD for further chunks
-	
-		
+
+
 DONE:
 	- Marching cubes
 	- Cubic chunks
-	
+
 ################################################################
 ## Player
 ################################################################
@@ -54,7 +58,7 @@ DONE:
 ################################################################
 
 	- everything...
-	
+
 ################################################################
 ## Misc
 ################################################################

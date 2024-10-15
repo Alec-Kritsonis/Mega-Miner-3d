@@ -74,7 +74,7 @@ public class TerraformingCamera : MonoBehaviour
         {
           // Calculate the position of the neighboring chunk
 
-          Vector3Int neighborChunkPos = ChunkManager.GetChunkCoordFromWorldCoord(
+          Vector3Int neighborChunkPos = ChunkUtils.GetChunkCoordFromWorldCoord(
             new Vector3(
               hitChunkPosition.x + xOffset * chunkSize,
               hitChunkPosition.y + yOffset * chunkSize,
@@ -84,12 +84,12 @@ public class TerraformingCamera : MonoBehaviour
           if (IsBrushAffectingChunk(neighborChunkPos, chunkSize, brushMin, brushMax))
           {
             // Get the neighboring chunk (assume you have a ChunkManager or similar system)
-            Chunk neighborChunk = ChunkManager.GetChunkAtPosition(neighborChunkPos);
+            Chunk neighborChunk = ChunkUtils.GetChunkAtPosition(neighborChunkPos);
             if (neighborChunk == null)
             {
-              ChunkManager.CreateChunkFromPlayer(
+              ChunkManager.Instance.CreateChunkFromPlayer(
                 neighborChunkPos,
-                ChunkManager.GetNoiseCoordFromWorldCoord(neighborChunkPos),
+                ChunkUtils.GetNoiseCoordFromWorldCoord(neighborChunkPos),
                 hitPoint,
                 brushSize,
                 add);

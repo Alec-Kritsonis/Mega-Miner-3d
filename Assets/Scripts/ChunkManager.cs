@@ -1,74 +1,118 @@
+using Unity.Burst;
 using System.Collections.Generic;
+using System.Diagnostics;
+using Unity.Collections;
+using Unity.Jobs;
 using UnityEngine;
+using Unity.VisualScripting;
+using System.Linq;
 
 public class ChunkManager : MonoBehaviour
 {
+  public static ChunkManager Instance { get; private set; }
+
   private const int _RenderDistance = 10;
   private const int _LOD = 4;
-  private static Dictionary<Vector3Int, GameObject> chunks = new Dictionary<Vector3Int, GameObject>();
 
-  private static Vector3Int _playerChunkPos = new Vector3Int(0, 0, 0);
+  private static Dictionary<Vector3Int, GameObject> _loadedChunks = new Dictionary<Vector3Int, GameObject>();
+  private static SortedList<float, Vector3Int> _chunkQueue = new SortedList<float, Vector3Int>();
+  private static Vector3Int _playerChunkPos = new Vector3Int(-100000, 0, -100000);
+  // TODO: Octrees or better spatial data strucutres.
+  private static Dictionary<Vector2Int, HashSet<int>> _discoveredChunks = new Dictionary<Vector2Int, HashSet<int>>();
 
-  public static void UpdatePlayerPosition(Vector3 playerPos)
+  private NativeArray<Vector3Int> chunkPositionsToGenerate;
+
+  private void Awake()
   {
-
-    if (GetChunkCoordFromWorldCoord(playerPos) != _playerChunkPos)
+    if (Instance == null)
     {
-      _playerChunkPos = GetChunkCoordFromWorldCoord(playerPos);
-      GenerateChunksAroundPlayer();
-      RemoveFarChunks();
+      Instance = this;
+    }
+    else
+    {
+      Destroy(this.gameObject);
     }
   }
 
-  // TODO load player made chunks
-  static void GenerateChunksAroundPlayer()
+  public void UpdatePlayerPosition(Vector3 playerPos)
   {
+    Vector3Int previousChunkPos = ChunkUtils.GetChunkCoordFromWorldCoord(playerPos);
+    if (previousChunkPos.x != _playerChunkPos.x && previousChunkPos.z != _playerChunkPos.z)
+    {
+      _playerChunkPos = ChunkUtils.GetChunkCoordFromWorldCoord(playerPos);
+      QueueNearbyChunks();
+      RemoveFarChunks();
+      GenerateChunksFromQueue();
+    }
+  }
+
+  // TODO: load player made chunks
+  void QueueNearbyChunks()
+  {
+    Stopwatch stopwatch = new Stopwatch();
+    stopwatch.Start();
     for (int chunkX = _playerChunkPos.x - _RenderDistance; chunkX < _playerChunkPos.x + _RenderDistance; chunkX++)
     {
       for (int chunkZ = _playerChunkPos.z - _RenderDistance; chunkZ < _playerChunkPos.z + _RenderDistance; chunkZ++)
       {
-        int[] verticalChunks = FindVerticalChunks(chunkX, chunkZ);
+        int[] verticalChunkCoords;
+        Vector2Int chunkSlice = new Vector2Int(chunkX, chunkZ);
 
-        foreach (int chunkY in verticalChunks)
+        if (_discoveredChunks.ContainsKey(chunkSlice))
+        {
+          verticalChunkCoords = _discoveredChunks[chunkSlice].ToArray();
+        }
+        else
+        {
+          verticalChunkCoords = FindVerticalChunks(chunkX, chunkZ);
+          _discoveredChunks.Add(chunkSlice, new HashSet<int>(verticalChunkCoords));
+        }
+
+        foreach (int chunkY in verticalChunkCoords)
         {
           Vector3Int chunkPos = new Vector3Int(chunkX, chunkY, chunkZ);
-          if (!chunks.ContainsKey(chunkPos))
+          float chunkDistance = Vector2.Distance(
+            new Vector2(_playerChunkPos.x, _playerChunkPos.z),
+            new Vector2(chunkPos.x, chunkPos.z));
+
+          if (!_loadedChunks.ContainsKey(chunkPos) && !_chunkQueue.ContainsKey(chunkDistance))
           {
-            chunks.Add(
-              chunkPos,
-              TerrainGenerator.CreateChunkFromNoise(
-                new Vector3(
-                  chunkX * GridMetrics.ChunkScale,
-                  chunkY * GridMetrics.ChunkScale,
-                  chunkZ * GridMetrics.ChunkScale),
-                new Vector3(
-                  chunkX * GridMetrics.NoiseScale,
-                  chunkY * GridMetrics.NoiseScale,
-                  chunkZ * GridMetrics.NoiseScale),
-                _LOD));
+            _chunkQueue.Add(chunkDistance, chunkPos);
           }
         }
       }
     }
+    stopwatch.Stop();
+    UnityEngine.Debug.Log(stopwatch.ElapsedMilliseconds);
   }
 
-  public static void CreateChunkFromPlayer(
-    Vector3Int chunkPos,
-    Vector3 noisePos,
-    Vector3 worldHitPosition,
-    float brushSize,
-    bool add)
+  void GenerateChunksFromQueue()
   {
-    chunks.Add(
-      chunkPos,
-      TerrainGenerator.CreateChunkFromPlayer(chunkPos, noisePos, worldHitPosition, brushSize, add, _LOD));
+    while (_chunkQueue.Count > 0)
+    {
+      Vector3Int chunkPos = _chunkQueue.Values[0];
+      _chunkQueue.RemoveAt(0);
+
+      _loadedChunks.Add(
+        chunkPos,
+        TerrainGenerator.CreateChunkFromNoise(
+          new Vector3(
+            chunkPos.x * GridMetrics.ChunkScale,
+            chunkPos.y * GridMetrics.ChunkScale,
+            chunkPos.z * GridMetrics.ChunkScale),
+          new Vector3(
+            chunkPos.x * GridMetrics.NoiseScale,
+            chunkPos.y * GridMetrics.NoiseScale,
+            chunkPos.z * GridMetrics.NoiseScale),
+          _LOD));
+    }
   }
 
-  static void RemoveFarChunks()
+  void RemoveFarChunks()
   {
     List<Vector3Int> chunksToRemove = new List<Vector3Int>();
 
-    foreach (Vector3Int chunkPos in chunks.Keys)
+    foreach (Vector3Int chunkPos in _loadedChunks.Keys)
     {
       if (!IsChunkInRenderDistance(chunkPos))
       {
@@ -80,13 +124,13 @@ public class ChunkManager : MonoBehaviour
     {
       if (!IsChunkInRenderDistance(chunkPos))
       {
-        Destroy(chunks[chunkPos]);
-        chunks.Remove(chunkPos);
+        Destroy(_loadedChunks[chunkPos]);
+        _loadedChunks.Remove(chunkPos);
       }
     }
   }
 
-  static bool IsChunkInRenderDistance(Vector3Int chunkPos)
+  bool IsChunkInRenderDistance(Vector3Int chunkPos)
   {
     Vector3 distance = chunkPos - _playerChunkPos;
 
@@ -95,6 +139,17 @@ public class ChunkManager : MonoBehaviour
       Mathf.Abs(distance.z) <= _RenderDistance;
   }
 
+  public void CreateChunkFromPlayer(
+    Vector3Int chunkPos,
+    Vector3 noisePos,
+    Vector3 worldHitPosition,
+    float brushSize,
+    bool add)
+  {
+    _loadedChunks.Add(
+      chunkPos,
+      TerrainGenerator.CreateChunkFromPlayer(chunkPos, noisePos, worldHitPosition, brushSize, add, _LOD));
+  }
 
   /// <summary>
   /// Finds if the noise for a chunk has below and above ground values, meaning
@@ -103,7 +158,7 @@ public class ChunkManager : MonoBehaviour
   /// <param name="x">Chunk coord x.</param>
   /// <param name="z">Chunk coord z.</param>
   /// <returns>List of vertical chunks at the given x, z chunk coord.</returns>
-  static int[] FindVerticalChunks(int x, int z)
+  int[] FindVerticalChunks(int x, int z)
   {
     List<int> verticalChunks = new List<int>();
     for (int y = 0; y < GridMetrics.VerticalChunks; y++)
@@ -111,7 +166,7 @@ public class ChunkManager : MonoBehaviour
       bool negativeNoise = false;
       bool positiveNoise = false;
       float[] noise = NoiseGenerator.Instance.GetNoise(
-        _LOD,
+        0,
         new Vector3(
           x * GridMetrics.NoiseScale,
           y * GridMetrics.NoiseScale,
@@ -138,44 +193,5 @@ public class ChunkManager : MonoBehaviour
     }
 
     return verticalChunks.ToArray();
-  }
-
-  //////////////////////////////////////////////////////////////////////////////
-  /// Util
-  //////////////////////////////////////////////////////////////////////////////
-
-  /// <summary>
-  /// Translates world position to Chunk object.
-  /// </summary>
-  /// <param name="worldPos">The world position to find a chunk at.</param>
-  /// <returns></returns>
-  public static Chunk GetChunkAtPosition(Vector3 worldPos)
-  {
-    Vector3 chunkPos = GetChunkCoordFromWorldCoord(worldPos);
-
-    return GameObject.Find($"Chunk-{chunkPos.x}.{chunkPos.y}.{chunkPos.z}")?.GetComponent<Chunk>();
-  }
-
-  /// <summary>
-  /// Translate world coord to chunk coord.
-  /// </summary>
-  /// <param name="worldPos">The world position to translate.</param>
-  /// <returns></returns>
-  public static Vector3Int GetChunkCoordFromWorldCoord(Vector3 worldPos)
-  {
-    return new Vector3Int(
-      Mathf.FloorToInt(worldPos.x / GridMetrics.ChunkScale),
-      Mathf.FloorToInt(worldPos.y / GridMetrics.ChunkScale),
-      Mathf.FloorToInt(worldPos.z / GridMetrics.ChunkScale));
-  }
-
-  /// <summary>
-  /// Translate world coord to noise coord.
-  /// </summary>
-  /// <param name="worldPos">The world position to translate.</param>
-  /// <returns></returns>
-  public static Vector3 GetNoiseCoordFromWorldCoord(Vector3 worldPos)
-  {
-    return GetChunkCoordFromWorldCoord(worldPos) * GridMetrics.ChunkScale / GridMetrics.NoiseScale;
   }
 }
